@@ -161,10 +161,12 @@ func (collection *Collection) query(sql string, args ...interface{}) *xorm.Sessi
 }
 
 func (collection *Collection) Exec(sqlStr string, args ...interface{}) (sql.Result, error) {
+	sqlOrArgs:=[]interface{}{sqlStr}
+	sqlOrArgs = append(sqlOrArgs, args...)
 	if collection.session == nil {
-		return collection.Engine.Exec(sqlStr, args...)
+		return collection.Engine.Exec(sqlOrArgs...)
 	}
-	return collection.session.Exec(sqlStr, args...)
+	return collection.session.Exec(sqlOrArgs...)
 }
 
 type Inserter interface {
