@@ -29,6 +29,7 @@ import (
 //
 //  // Where age > 32 and age < 35
 //  db.Cond{"age >": 32, "age <": 35}
+//  增加json格式的支持
 type Cond map[string]interface{}
 
 func toConds(constraints Cond, concat func(conds ...builder.Cond) builder.Cond) builder.Cond {
@@ -37,9 +38,15 @@ func toConds(constraints Cond, concat func(conds ...builder.Cond) builder.Cond) 
 	}
 	if len(constraints) == 1 {
 		for k, v := range constraints {
+			if strings.HasPrefix(k,"json") {
+				expr:=strings.TrimLeft(k,"json")
+				return  toJsonCond(expr,v)
+			}
+
 			if v == nil {
 				return builder.Expr(k)
 			}
+
 			ss := strings.Fields(k)
 			switch len(ss) {
 			case 1:
@@ -83,6 +90,13 @@ func toConds(constraints Cond, concat func(conds ...builder.Cond) builder.Cond) 
 		if v == nil {
 			deleted = append(deleted, k)
 			conds = append(conds, builder.Expr(k))
+			continue
+		}
+
+		if strings.HasPrefix(k,"json") {
+			deleted = append(deleted, k)
+			expr:=strings.TrimLeft(k,"json")
+			conds = append(conds, toJsonCond(expr,v))
 			continue
 		}
 
@@ -172,6 +186,36 @@ func toNotCond(name, op string, value interface{}) builder.Cond {
 		}
 	}
 	return nil
+}
+
+//json格式数据  这里暂时是按照mysql判断
+func toJsonCond(sql string,arg interface{}) builder.Cond {
+	switch arg.(type) {
+	case []float64:
+		nums,_:=arg.([]float64)
+		sqlArg:=fmt.Sprint(nums[0])
+		for k,v:=range nums {
+			if k>0 {
+				sqlArg += fmt.Sprint(",",v)
+			}
+		}
+		return builder.Expr(strings.Replace(sql,"?",sqlArg,-1))
+	case []string:
+		strs,_:=arg.([]string)
+		sqlArg:=fmt.Sprint("\"",strs[0],"\"")
+		for k,v:=range strs {
+			if k>0 {
+				sqlArg += fmt.Sprint(",\"",v,"\"")
+			}
+		}
+		return builder.Expr(strings.Replace(sql,"?",sqlArg,-1))
+	case []interface{}:
+		//暂不做处理
+	}
+	if arg == nil{
+		return builder.Expr(sql)
+	}
+	return builder.Expr(sql,arg)
 }
 
 func toExists(expr string, value interface{}) builder.Cond {
